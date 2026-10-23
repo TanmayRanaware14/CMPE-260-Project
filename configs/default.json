@@ -1,0 +1,25 @@
+{
+  "environment_id": "llvm-v0",
+  "observation_space": "Autophase",
+  "reward_space": "IrInstructionCountOz",
+  "max_episode_steps": 20,
+  "seed": 7,
+  "train_benchmarks": [
+    "cbench-v1/qsort",
+    "cbench-v1/crc32",
+    "cbench-v1/adpcm",
+    "cbench-v1/bitcount"
+  ],
+  "validation_benchmarks": [
+    "cbench-v1/sha",
+    "cbench-v1/dijkstra"
+  ],
+  "test_benchmarks": [
+    "cbench-v1/blowfish",
+    "cbench-v1/stringsearch"
+  ],
+  "total_timesteps": 10000,
+  "ppo_learning_rate": 0.0003,
+  "ppo_n_steps": 128,
+  "ppo_batch_size": 64
+}

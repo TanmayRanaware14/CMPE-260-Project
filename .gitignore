@@ -1,0 +1,17 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+.env
+.ipynb_checkpoints/
+results/*
+!results/.gitkeep
+figures/*
+!figures/.gitkeep
+logs/
+tensorboard/
+*.bc
+*.ll
+*.o
