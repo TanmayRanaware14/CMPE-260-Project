@@ -1,27 +1,57 @@
 
 import numpy as np
 
-from .environment import reset_compat, step_compat
+try:
+    from .environment import reset_compat, step_compat
+except ImportError:
+    from environment import reset_compat, step_compat
+
+
+def _session_failure(info):
+    """Return a compiler-session failure message carried in step info.
+
+    CompilerGym ends an episode and sets info["error_details"] when a pass
+    causes an unrecoverable compiler or service failure. A normal early stop
+    has no such message.
+    """
+    if not isinstance(info, dict):
+        return None
+
+    details = info.get("error_details")
+    if not details:
+        return None
+
+    error_type = info.get("error_type")
+    if error_type:
+        return f"{error_type}: {details}"
+    return str(details)
 
 
 def run_random_episode(env, max_steps=20, seed=0):
-    """Apply randomly selected actions for a fixed optimization budget."""
+    """Apply randomly selected actions for a fixed optimization budget.
+
+    The return value keeps the original keys. "error" is None when every
+    applied pass completed, and a message when CompilerGym reported an
+    unrecoverable session failure. Reward accounting is unchanged either way.
+    """
     rng = np.random.default_rng(seed)
     reset_compat(env)
 
     total_reward = 0.0
     actions = []
     rewards = []
+    error = None
 
     for _ in range(max_steps):
         action = int(rng.integers(0, env.action_space.n))
-        _, reward, done, _ = step_compat(env, action)
+        _, reward, done, info = step_compat(env, action)
 
         actions.append(action)
         rewards.append(reward)
         total_reward += reward
 
-        if done:
+        error = _session_failure(info)
+        if error or done:
             break
 
     return {
@@ -29,6 +59,7 @@ def run_random_episode(env, max_steps=20, seed=0):
         "steps": len(actions),
         "actions": actions,
         "rewards": rewards,
+        "error": error,
     }
 
 

@@ -33,6 +33,29 @@ Test the environment:
 python scripts/smoke_test.py
 ```
 
+## Random baseline pilot
+
+`scripts/run_random_baseline.py` connects the configuration loader, CompilerGym environment, and random policy. It runs one episode for every training benchmark and seed. Validation and test programs are left unused. Each episode applies at most `max_episode_steps` randomly chosen LLVM passes, then records the result.
+
+Run it from the repository root:
+
+```bash
+python scripts/run_random_baseline.py --config configs/default.json --seeds 7 17 27 --output results/random_baseline.csv
+```
+
+Those seeds and that output path are the defaults. Generated files under `results/` stay ignored. The same command with `--output docs/checkin2/random_baseline.csv` writes the check-in copy, which is tracked with the runner.
+
+Important CSV fields:
+
+- `benchmark`, `split`, and `seed` identify the training program and the action-selection seed. `split` is `train` for this pilot.
+- `steps_taken` is the number of passes applied. `actions` is a JSON list of pass indices, so a sequence can be inspected or replayed.
+- `initial_ir_count` and `final_ir_count` are raw `IrInstructionCount` observations taken on the original program and after the sequence. `instruction_delta` is `initial_ir_count - final_ir_count`. `instruction_reduction_pct` is that delta as a percentage of the initial count, and only when the initial count is positive. A negative percentage means the sequence increased the instruction count.
+- `total_reward` is the sum of per-step `IrInstructionCountOz` rewards. That reward is scaled against the `-Oz` baseline, so it is a different number from `instruction_reduction_pct`.
+- `elapsed_seconds` is wall-clock time for the optimization procedure: resetting to the original program and applying the sampled passes. It is not the execution time of the compiled program, and it does not include environment construction or the separate instruction-count reads.
+- `status` is `ok`, `error`, or `aborted`. A failed or aborted row keeps the benchmark, seed, and `error` text. Counts, the percentage, and the cumulative reward are left blank when that optimization outcome is not available. Blank cells are missing measurements, not zeros.
+
+A negative `instruction_reduction_pct` means the sampled sequence increased the IR instruction count.
+
 ## Workflow
 
 1. Verify CompilerGym installation and benchmark access.
