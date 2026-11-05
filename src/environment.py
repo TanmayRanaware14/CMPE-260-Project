@@ -1,80 +1,112 @@
 
+import compiler_gym
+import gymnasium as gym
 import numpy as np
 
 
 def make_compilergym_env(
-    benchmark,
-    environment_id="llvm-v0",
+    benchmark=None,
     observation_space="Autophase",
     reward_space="IrInstructionCountOz",
 ):
-    """Create a CompilerGym LLVM environment."""
-    try:
-        import compiler_gym
-    except ImportError as exc:
-        raise RuntimeError(
-            "CompilerGym is not installed. Check the README and "
-            "the installed Python version."
-        ) from exc
+    """Create and configure a CompilerGym LLVM environment."""
 
-    return compiler_gym.make(
-        environment_id,
-        benchmark=benchmark,
-        observation_space=observation_space,
-        reward_space=reward_space,
-    )
-
-
-def reset_compat(env, benchmark=None, seed=None):
-    """Normalize old Gym and newer Gymnasium reset results."""
-    kwargs = {}
+    env = compiler_gym.make("llvm-v0")
 
     if benchmark is not None:
-        kwargs["benchmark"] = benchmark
+        env.benchmark = benchmark
 
-    if seed is not None:
-        kwargs["seed"] = seed
+    env.observation_space = observation_space
+    env.reward_space = reward_space
 
-    result = env.reset(**kwargs)
+    return env
 
-    if isinstance(result, tuple) and len(result) == 2:
+
+def reset_compat(env):
+    """Handle CompilerGym and Gymnasium reset return formats."""
+
+    result = env.reset()
+
+    if isinstance(result, tuple):
         observation, info = result
-    else:
-        observation, info = result, {}
+        return observation, info
 
-    return np.asarray(observation, dtype=np.float32), info
+    return result, {}
 
 
 def step_compat(env, action):
-    """Normalize four-value and five-value step APIs."""
-    result = env.step(int(action))
+    """Handle old Gym and new Gymnasium step return formats."""
+
+    result = env.step(action)
 
     if len(result) == 5:
         observation, reward, terminated, truncated, info = result
-        done = terminated or truncated
-    elif len(result) == 4:
-        observation, reward, done, info = result
     else:
-        raise RuntimeError(
-            f"Unexpected env.step() result length: {len(result)}"
-        )
+        observation, reward, done, info = result
+        terminated = done
+        truncated = False
 
-    return (
-        np.asarray(observation, dtype=np.float32),
-        float(reward),
-        bool(done),
-        info or {},
-    )
+    return observation, reward, terminated, truncated, info
 
 
 def action_count(env):
-    """Return the number of actions for a discrete action space."""
-    count = getattr(env.action_space, "n", None)
+    """Return the number of available compiler optimization actions."""
 
-    if count is None:
-        raise RuntimeError(
-            "The environment does not expose a discrete action space "
-            "with an .n attribute. Inspect its action-space API."
+    return env.action_space.n
+
+
+class CompilerGymWrapper(gym.Env):
+    """Adapt CompilerGym to the Gymnasium interface used by SB3 PPO."""
+
+    def __init__(
+        self,
+        benchmark,
+        observation_space="Autophase",
+        reward_space="IrInstructionCountOz",
+        max_steps=20,
+    ):
+        super().__init__()
+
+        self.env = make_compilergym_env(
+            benchmark=benchmark,
+            observation_space=observation_space,
+            reward_space=reward_space,
         )
 
-    return int(count)
+        self.max_steps = max_steps
+        self.current_step = 0
+
+        self.action_space = gym.spaces.Discrete(action_count(self.env))
+
+        observation_shape = self.env.observation_space.shape
+        self.observation_space = gym.spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=observation_shape,
+            dtype=np.float32,
+        )
+
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+
+        observation, info = reset_compat(self.env)
+        self.current_step = 0
+
+        return np.asarray(observation, dtype=np.float32), info
+
+    def step(self, action):
+        observation, reward, terminated, truncated, info = step_compat(
+            self.env, action
+        )
+
+        self.current_step += 1
+
+        if self.current_step >= self.max_steps:
+            truncated = True
+
+        observation = np.asarray(observation, dtype=np.float32)
+
+        return observation, float(reward), terminated, truncated, info
+
+    def close(self):
+        self.env.close()
