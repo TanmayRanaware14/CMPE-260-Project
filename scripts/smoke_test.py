@@ -31,9 +31,10 @@ def main():
         print("Action count:", action_count(env))
 
         action = env.action_space.sample()
-        next_observation, reward, done, step_info = step_compat(
+        next_observation, reward, terminated, truncated, step_info = step_compat(
             env, action
         )
+        done = terminated or truncated
 
         print("\nSampled action:", action)
         print("Reward:", reward)

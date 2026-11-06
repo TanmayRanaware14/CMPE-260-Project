@@ -56,6 +56,27 @@ Important CSV fields:
 
 A negative `instruction_reduction_pct` means the sampled sequence increased the IR instruction count.
 
+## Check-in 3 experiments
+
+Splits are in `configs/default.json`. Training (`qsort`, `crc32`, `adpcm`, `bitcount`), validation (`sha`, `dijkstra`), and the within-family test set are cBench programs. The cross-family test set is seven CHStone programs. CHStone's `adpcm`, `blowfish`, `gsm`, `jpeg`, and `sha` are excluded because cBench has programs with the same names. MiBench is not used as the cross-family set: 30 of its 40 entries are variants of 12 cBench programs, including the training programs `qsort` and `bitcount`.
+
+Run from the repository root, in this order:
+
+```bash
+python scripts/run_baselines.py      # original, -O3, -Oz, random (3 seeds), sequential greedy -> results/baselines.csv
+python scripts/train_ppo.py          # PPO, 3 seeds, validation-selected checkpoints -> results/ppo/
+python scripts/evaluate_ppo.py       # frozen checkpoints on every split -> results/ppo_eval.csv
+python scripts/summarize_results.py  # results/summary.csv, results/per_program.csv, figures/*.png
+```
+
+`train_ppo.py --timesteps 204800 --eval-every 10240 --output-dir results/ppo_long` is the longer training run. Pass `--checkpoint-dir results/ppo_long --output results/ppo_long_eval.csv` to `evaluate_ppo.py` to evaluate it.
+
+- **Greedy** tries all 124 passes on a fork of the current state, commits the largest immediate IR instruction-count reduction (ties go to the lowest action index), and stops when nothing reduces the count or after 20 passes. `trials` counts every candidate transformation it tried.
+- **PPO** uses the Stable-Baselines3 `MlpPolicy` (two hidden layers of 64 units), learning rate 3e-4, clip 0.2, `gamma=1.0`, entropy coefficient 0.01, and 256 steps per rollout. The observation is `log1p(Autophase)` (56 features) plus the current count divided by the initial count and the fraction of the pass budget left. The step reward is `(I[t-1] - I[t]) / I[0]` from raw `IrInstructionCount`, so an episode's return is its fractional reduction. Each reset samples one training program uniformly. Every 2,560 steps the policy is evaluated deterministically on the validation programs, and the checkpoint with the best mean reduction is kept. Test programs are never used for selection.
+- `-O3` and `-Oz` counts come from CompilerGym's `IrInstructionCountO3` and `IrInstructionCountOz` observations of the same LLVM version.
+
+The tracked copies of these results are in `docs/checkin3/`.
+
 ## Workflow
 
 1. Verify CompilerGym installation and benchmark access.

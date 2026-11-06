@@ -7,6 +7,9 @@ def train_ppo(
     batch_size=64,
     seed=7,
     verbose=1,
+    gamma=0.99,
+    ent_coef=0.0,
+    callback=None,
 ):
     """Train a PPO policy using Stable-Baselines3."""
     from stable_baselines3 import PPO
@@ -17,9 +20,11 @@ def train_ppo(
         learning_rate=learning_rate,
         n_steps=n_steps,
         batch_size=batch_size,
+        gamma=gamma,
+        ent_coef=ent_coef,
         seed=seed,
         verbose=verbose,
     )
 
-    model.learn(total_timesteps=total_timesteps)
+    model.learn(total_timesteps=total_timesteps, callback=callback)
     return model

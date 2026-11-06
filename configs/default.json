@@ -16,10 +16,30 @@
   ],
   "test_benchmarks": [
     "cbench-v1/blowfish",
-    "cbench-v1/stringsearch"
+    "cbench-v1/stringsearch",
+    "cbench-v1/patricia",
+    "cbench-v1/rijndael",
+    "cbench-v1/susan",
+    "cbench-v1/gsm"
+  ],
+  "cross_family_test_benchmarks": [
+    "chstone-v0/aes",
+    "chstone-v0/dfadd",
+    "chstone-v0/dfdiv",
+    "chstone-v0/dfmul",
+    "chstone-v0/dfsin",
+    "chstone-v0/mips",
+    "chstone-v0/motion"
   ],
   "total_timesteps": 10000,
   "ppo_learning_rate": 0.0003,
   "ppo_n_steps": 128,
-  "ppo_batch_size": 64
+  "ppo_batch_size": 64,
+  "ppo_seeds": [7, 17, 27],
+  "ppo_total_timesteps": 40960,
+  "ppo_eval_every": 2560,
+  "ppo_gamma": 1.0,
+  "ppo_ent_coef": 0.01,
+  "ppo_n_steps_multi": 256,
+  "random_seeds": [7, 17, 27]
 }

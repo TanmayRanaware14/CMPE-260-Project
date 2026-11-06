@@ -2,9 +2,9 @@
 import numpy as np
 
 try:
-    from .environment import reset_compat, step_compat
+    from .environment import ir_instruction_count, reset_compat, step_compat
 except ImportError:
-    from environment import reset_compat, step_compat
+    from environment import ir_instruction_count, reset_compat, step_compat
 
 
 def _session_failure(info):
@@ -44,14 +44,14 @@ def run_random_episode(env, max_steps=20, seed=0):
 
     for _ in range(max_steps):
         action = int(rng.integers(0, env.action_space.n))
-        _, reward, done, info = step_compat(env, action)
+        _, reward, terminated, truncated, info = step_compat(env, action)
 
         actions.append(action)
         rewards.append(reward)
         total_reward += reward
 
         error = _session_failure(info)
-        if error or done:
+        if error or terminated or truncated:
             break
 
     return {
@@ -83,7 +83,7 @@ def run_greedy_first_action(env, candidate_actions=8, seed=0):
 
     for action in candidates:
         reset_compat(env)
-        _, reward, _, _ = step_compat(env, int(action))
+        _, reward, _, _, _ = step_compat(env, int(action))
 
         if reward > best_reward:
             best_reward = reward
@@ -93,4 +93,62 @@ def run_greedy_first_action(env, candidate_actions=8, seed=0):
         "action": best_action,
         "immediate_reward": float(best_reward),
         "candidate_actions": candidates.tolist(),
+    }
+
+
+def run_greedy_sequence(env, max_steps=20):
+    """Sequential greedy pass selection on IR instruction count.
+
+    At each step every action is tried on a fork of the current state. The
+    action with the largest immediate reduction is committed, ties going to
+    the lowest action index. Search stops when no action reduces the count or
+    the budget is used. "trials" counts every candidate transformation.
+    """
+    reset_compat(env)
+    current = ir_instruction_count(env)
+    actions = []
+    counts = [current]
+    trials = 0
+    error = None
+
+    for _ in range(max_steps):
+        best_action = None
+        best_count = current
+
+        for action in range(env.action_space.n):
+            trial = env.fork()
+            try:
+                _, _, terminated, _, info = step_compat(trial, action)
+                trials += 1
+                if _session_failure(info) or terminated:
+                    continue
+                count = ir_instruction_count(trial)
+            finally:
+                trial.close()
+
+            if count < best_count:
+                best_count = count
+                best_action = action
+
+        if best_action is None:
+            break
+
+        _, _, terminated, _, info = step_compat(env, best_action)
+        error = _session_failure(info)
+        if error:
+            break
+
+        current = ir_instruction_count(env)
+        actions.append(best_action)
+        counts.append(current)
+        if terminated:
+            break
+
+    return {
+        "steps": len(actions),
+        "actions": actions,
+        "counts": counts,
+        "final_count": current,
+        "trials": trials,
+        "error": error,
     }
