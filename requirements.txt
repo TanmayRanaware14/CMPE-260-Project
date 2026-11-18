@@ -1,7 +1,7 @@
-compiler_gym
-gymnasium
 numpy
 pandas
 matplotlib
+gymnasium
 stable-baselines3
 torch
+pytest

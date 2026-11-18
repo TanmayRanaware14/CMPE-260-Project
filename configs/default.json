@@ -3,23 +3,50 @@
   "observation_space": "Autophase",
   "reward_space": "IrInstructionCountOz",
   "max_episode_steps": 20,
-  "seed": 7,
+  "reward_clip": 5.0,
+  "use_action_histogram": true,
+
   "train_benchmarks": [
-    "cbench-v1/qsort",
-    "cbench-v1/crc32",
-    "cbench-v1/adpcm",
-    "cbench-v1/bitcount"
+    "benchmark://cbench-v1/adpcm",
+    "benchmark://cbench-v1/bitcount",
+    "benchmark://cbench-v1/bzip2",
+    "benchmark://cbench-v1/crc32",
+    "benchmark://cbench-v1/gsm",
+    "benchmark://cbench-v1/ispell",
+    "benchmark://cbench-v1/jpeg-c",
+    "benchmark://cbench-v1/lame",
+    "benchmark://cbench-v1/patricia",
+    "benchmark://cbench-v1/qsort",
+    "benchmark://cbench-v1/rijndael",
+    "benchmark://cbench-v1/susan"
   ],
   "validation_benchmarks": [
-    "cbench-v1/sha",
-    "cbench-v1/dijkstra"
+    "benchmark://cbench-v1/dijkstra",
+    "benchmark://cbench-v1/sha"
   ],
   "test_benchmarks": [
-    "cbench-v1/blowfish",
-    "cbench-v1/stringsearch"
+    "benchmark://cbench-v1/blowfish",
+    "benchmark://cbench-v1/stringsearch",
+    "benchmark://cbench-v1/stringsearch2",
+    "benchmark://cbench-v1/tiff2bw"
   ],
-  "total_timesteps": 10000,
+  "shift_benchmarks": [
+    "benchmark://npb-v0/10",
+    "benchmark://npb-v0/50",
+    "benchmark://blas-v0/1",
+    "benchmark://blas-v0/10"
+  ],
+
+  "ppo_seeds": [7, 8, 9],
+  "total_timesteps": 30000,
   "ppo_learning_rate": 0.0003,
-  "ppo_n_steps": 128,
-  "ppo_batch_size": 64
+  "ppo_n_steps": 256,
+  "ppo_batch_size": 64,
+  "ppo_ent_coef": 0.01,
+  "ppo_gamma": 0.99,
+  "ppo_net_arch": [128, 128],
+
+  "baseline_seeds": [0, 1, 2],
+  "random_search_trials": 16,
+  "greedy_candidates": 32
 }

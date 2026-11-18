@@ -1,0 +1,17 @@
+# Suggested starting point for the REAL backend. UNVERIFIED: CompilerGym is archived,
+# so confirm against your platform and adjust based on the actual install errors.
+#
+# Use a separate environment, ideally Python 3.8 or 3.9, on Linux x86-64 or Intel macOS:
+#   python3.9 -m venv .venv-cg && source .venv-cg/bin/activate
+#   pip install -r requirements-compilergym.txt
+#
+# Older Python needs older Stable-Baselines3 / torch; if the latest ones will not
+# install, pin versions that support your Python (pip will tell you which).
+compiler_gym==0.2.5
+numpy
+pandas
+matplotlib
+gymnasium
+stable-baselines3
+torch
+pytest

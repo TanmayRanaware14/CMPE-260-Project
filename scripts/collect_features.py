@@ -1,4 +1,11 @@
+"""Collect initial Autophase features and instruction counts for every benchmark.
 
+    python scripts/collect_features.py [--mock]
+
+Writes results/initial_features.csv (one row per program).
+"""
+
+import argparse
 import csv
 import sys
 from pathlib import Path
@@ -6,81 +13,63 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from environment import (
+from compiler_pass_rl.config import get_splits, load_config  # noqa: E402
+from compiler_pass_rl.environment import (  # noqa: E402
+    instruction_counts,
     make_compilergym_env,
     reset_compat,
 )
 
 
-BENCHMARKS = [
-    "cbench-v1/qsort",
-    "cbench-v1/crc32",
-    "cbench-v1/adpcm",
-    "cbench-v1/bitcount",
-]
-
-
 def main():
-    output_dir = ROOT / "results"
-    output_dir.mkdir(exist_ok=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--mock", action="store_true")
+    parser.add_argument("--config", default=str(ROOT / "configs/default.json"))
+    parser.add_argument("--output", default=str(ROOT / "results/initial_features.csv"))
+    args = parser.parse_args()
 
-    rows = []
+    config = load_config(args.config)
+    backend = "mock" if args.mock else "compilergym"
+    splits = get_splits(config, backend)
 
+    first = next(iter(splits.values()))[0]
     env = make_compilergym_env(
-        benchmark=BENCHMARKS[0],
-        observation_space="Autophase",
-        reward_space="IrInstructionCountOz",
+        benchmark=first,
+        environment_id=config["environment_id"],
+        observation_space=config["observation_space"],
+        reward_space=config["reward_space"],
+        backend=backend,
     )
-
+    rows, skipped = [], []
     try:
-        for benchmark in BENCHMARKS:
-            try:
-                observation, _ = reset_compat(
-                    env, benchmark=benchmark
-                )
-                features = observation.flatten()
-
-                row = {
-                    "benchmark": benchmark,
-                    "num_features": len(features),
-                }
-
-                for index, value in enumerate(features):
-                    row[f"feature_{index}"] = float(value)
-
+        for split, benchmarks in splits.items():
+            for benchmark in benchmarks:
+                try:
+                    observation, _ = reset_compat(env, benchmark=benchmark)
+                    counts = instruction_counts(env)
+                except Exception as exc:
+                    skipped.append((benchmark, repr(exc)))
+                    print(f"SKIPPED {benchmark}: {exc}")
+                    continue
+                row = {"split": split, "benchmark": benchmark,
+                       "init_count": counts["current"], "oz_count": counts["oz"],
+                       "o3_count": counts["o3"]}
+                for i, value in enumerate(observation.flatten()):
+                    row[f"f{i}"] = int(value)
                 rows.append(row)
-
-                print(f"\n{benchmark}")
-                print("Feature count:", len(features))
-                print("First 10 features:", features[:10])
-
-            except Exception as exc:
-                print(f"Could not load {benchmark}: {exc}")
-
+                print(f"[{split}] {benchmark}: {counts}")
     finally:
         env.close()
 
     if not rows:
-        raise RuntimeError(
-            "No benchmarks loaded. Check the environment and benchmark URIs."
-        )
-
-    max_features = max(row["num_features"] for row in rows)
-    columns = ["benchmark", "num_features"] + [
-        f"feature_{i}" for i in range(max_features)
-    ]
-
-    with (output_dir / "initial_features.csv").open(
-        "w", newline="", encoding="utf-8"
-    ) as file:
-        writer = csv.DictWriter(file, fieldnames=columns)
+        raise RuntimeError("No benchmarks could be loaded.")
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
-
-    print(
-        f"\nSaved {len(rows)} observations to "
-        "results/initial_features.csv"
-    )
+    print(f"Wrote {len(rows)} rows to {output} ({len(skipped)} skipped)")
 
 
 if __name__ == "__main__":
